@@ -29,11 +29,21 @@
 #define JTAG_IN_EP 0x81
 #define JTAG_OUT_EP 0x02
 
-void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf);
+#include <stdint.h>
+#include "usbd_core.h"
 
-void usbd_ftdi_set_line_coding(uint32_t baudrate, uint8_t databits, uint8_t parity, uint8_t stopbits);
-void usbd_ftdi_set_dtr(bool dtr);
-void usbd_ftdi_set_rts(bool rts);
+struct vendor_ctx {
+    void (*set_line_coding)(uint32_t baudrate, uint8_t databits, uint8_t parity, uint8_t stopbits);
+    void (*set_dtr)(bool dtr);
+    void (*set_rts)(bool rts);
+};
+
+void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf,
+    int (*vendor_handler)(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len));
+
+int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len, const struct vendor_ctx *ctx);
+void ftdi_notify_handler(uint8_t event, void* arg);
+
 uint32_t usbd_ftdi_get_sof_tick(void);
 uint32_t usbd_ftdi_get_latency_timer1(void);
 uint32_t usbd_ftdi_get_latency_timer2(void);

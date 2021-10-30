@@ -23,6 +23,8 @@
 #include "usbd_core.h"
 #include "usbd_ftdi.h"
 
+extern void led_set(uint8_t idx, uint8_t status);
+
 extern const uint16_t ftdi_eeprom_info[];
 static volatile uint32_t sof_tick = 0;
 static uint8_t Latency_Timer1 = 0x0004;
@@ -74,8 +76,8 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 	int baudrate;
 	uint8_t frac[] = {0, 8, 4, 2, 6, 10, 12, 14};
 	int divisor = itdf_divisor & 0x3fff;
- 	divisor <<= 4;
- 	divisor |= frac[(itdf_divisor >> 14) & 0x07];
+	divisor <<= 4;
+	divisor |= frac[(itdf_divisor >> 14) & 0x07];
 
 	if(itdf_divisor == 0x01)
 	{
@@ -99,7 +101,7 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 }
 
 //static char datatmp[2]={0x32, 0x60};
-static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len)
+int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len, const struct vendor_ctx *ctx)
 {
 	static uint32_t actual_baudrate = 1200;
 	switch (pSetup->bRequest) 
@@ -116,22 +118,22 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 			if(pSetup->wValue == SIO_SET_DTR_HIGH)
 			{
 				//USBD_LOG("DTR 1\r\n");
-				usbd_ftdi_set_dtr(true);
+				ctx->set_dtr(true);
 			}
 			else if(pSetup->wValue == SIO_SET_DTR_LOW)
 			{
 				//USBD_LOG("DTR 0\r\n");
-				usbd_ftdi_set_dtr(false);
+				ctx->set_dtr(false);
 			}
 			else if(pSetup->wValue == SIO_SET_RTS_HIGH)
 			{
 				//USBD_LOG("RTS 1\r\n");
-				usbd_ftdi_set_rts(true);
+				ctx->set_rts(true);
 			}
 			else if(pSetup->wValue == SIO_SET_RTS_LOW)
 			{
 				//USBD_LOG("RTS 0\r\n");
-				usbd_ftdi_set_rts(false);
+				ctx->set_rts(false);
 			}			
 			break;
 		case SIO_SET_FLOW_CTRL_REQUEST:
@@ -147,13 +149,13 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		/**
 		 * D0-D7 databits  BITS_7=7, BITS_8=8
 		 * D8-D10 parity  NONE=0, ODD=1, EVEN=2, MARK=3, SPACE=4
-		 * D11-D12 		STOP_BIT_1=0, STOP_BIT_15=1, STOP_BIT_2=2 
-		 * D14  		BREAK_OFF=0, BREAK_ON=1
+		 * D11-D12		STOP_BIT_1=0, STOP_BIT_15=1, STOP_BIT_2=2 
+		 * D14			BREAK_OFF=0, BREAK_ON=1
 		 **/
-		 	if(actual_baudrate != 1200)
+			if(actual_baudrate != 1200)
 			{
 				//USBD_LOG("CDC_SET_LINE_CODING <%d %d %s %s>\r\n",actual_baudrate,(uint8_t)pSetup->wValue,parity_name[(uint8_t)(pSetup->wValue>>8)],stop_name[(uint8_t)(pSetup->wValue>>11)]);
-				usbd_ftdi_set_line_coding(actual_baudrate,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
+				ctx->set_line_coding(actual_baudrate,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
 			}
 			break;
 
@@ -223,7 +225,8 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 	return 0;
 
 }
-static void ftdi_notify_handler(uint8_t event, void* arg)
+
+void ftdi_notify_handler(uint8_t event, void* arg)
 {
 	switch (event)
 	{
@@ -239,18 +242,6 @@ static void ftdi_notify_handler(uint8_t event, void* arg)
 	}	
 }
 
-__weak void usbd_ftdi_set_line_coding(uint32_t baudrate,uint8_t databits,uint8_t parity,uint8_t stopbits)
-{
-
-}
-__weak void usbd_ftdi_set_dtr(bool dtr)
-{
-
-}
-__weak void usbd_ftdi_set_rts(bool rts)
-{
-
-}
 uint32_t usbd_ftdi_get_sof_tick(void)
 {
 	return sof_tick;
@@ -266,7 +257,8 @@ uint32_t usbd_ftdi_get_latency_timer2(void)
 	return Latency_Timer2;
 }
 
-void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf)
+void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf,
+    int (*vendor_handler)(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len))
 {
 	static usbd_class_t *last_class = NULL;
 
@@ -278,7 +270,7 @@ void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf)
 
 	intf->class_handler = NULL;
 	intf->custom_handler = NULL;
-	intf->vendor_handler = ftdi_vendor_request_handler;
+	intf->vendor_handler = vendor_handler;
 	intf->notify_handler = ftdi_notify_handler;
 	usbd_class_add_interface(class,intf);
 }

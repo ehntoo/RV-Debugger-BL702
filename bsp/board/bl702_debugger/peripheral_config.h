@@ -44,10 +44,10 @@
 
 #ifdef BSP_USING_UART1
 #define BSP_USING_DMA0_CH2
+#define BSP_USING_DMA0_CH3
 #endif
 
 #ifdef BSP_USING_SPI0
-#define BSP_USING_DMA0_CH3
 #define BSP_USING_DMA0_CH4
 #endif
 
@@ -212,7 +212,7 @@
  .direction = DMA_MEMORY_TO_PERIPH, \
  .transfer_mode = DMA_LLI_ONCE_MODE, \
  .src_req = DMA_REQUEST_NONE, \
- .dst_req = DMA_REQUEST_SPI0_TX, \
+ .dst_req = DMA_REQUEST_UART0_TX, \
  .src_width = DMA_TRANSFER_WIDTH_8BIT , \
  .dst_width = DMA_TRANSFER_WIDTH_8BIT , \
 }

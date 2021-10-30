@@ -29,7 +29,7 @@
 extern uint32_t _HeapBase;
 extern uint32_t _HeapSize;
 
-static uint8_t uart_dbg_disable=0;
+static uint8_t uart_dbg_disable=1;
 
 #ifdef SHELL_SUPPORT
 Shell shell;
